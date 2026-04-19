@@ -16,7 +16,7 @@ const authService = new AuthService();
  * Middleware that requires a valid JWT.
  * Populates req.user with the correct User subclass via Factory pattern.
  */
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
 
@@ -37,7 +37,7 @@ function authenticate(req, res, next) {
         }
 
         // verifyToken uses Factory pattern to return Admin/Manager/Member
-        const user = authService.verifyToken(token);
+        const user = await authService.verifyToken(token);
         req.user = user;
 
         next();

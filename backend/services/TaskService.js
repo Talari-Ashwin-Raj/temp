@@ -2,11 +2,6 @@
  * TaskService
  * 
  * Design Pattern: SERVICE LAYER — business logic for task management.
- * 
- * Maps to:
- *   useCaseDiagram  → UC5 (Create Task), UC6 (Assign Task), UC7 (Update Status)
- *   sequenceDiagram → Full create-and-assign flow (steps 1-9 + async notification)
- *   classDiagram    → Task.changeStatus(), Manager.assignTask(), Member.updateTaskStatus()
  */
 
 const TaskRepository = require('../repositories/TaskRepository');
@@ -28,27 +23,7 @@ class TaskService {
         this.#userRepository = new UserRepository();
     }
 
-    /**
-     * Create a new task and optionally assign it.
-     * 
-     * This method implements the full Sequence Diagram flow:
-     *   1. Manager clicks "Create Task" → frontend sends POST /api/tasks
-     *   2. API validates Manager permissions
-     *   3. INSERT INTO tasks
-     *   4. Return 201 Created
-     *   5. Async: Send notification to assigned member
-     * 
-     * @param {Object} data
-     * @param {number} data.projectId
-     * @param {string} data.title
-     * @param {string} [data.description]
-     * @param {string} [data.deadline]
-     * @param {number} [data.assignedTo]
-     * @param {User}   requestingUser
-     * @returns {Object}
-     */
-    createTask({ projectId, title, description, deadline, assignedTo }, requestingUser) {
-        // Step 2: Validate permissions (Polymorphism)
+    async createTask({ projectId, title, description, deadline, assignedTo }, requestingUser) {
         if (!requestingUser.canAssignTask() && requestingUser.getRoleName() !== 'admin') {
             throw new Error('Insufficient permissions: only managers and admins can create tasks');
         }
@@ -60,106 +35,82 @@ class TaskService {
             throw new Error('Project ID is required');
         }
 
-        // Verify project exists
-        const project = this.#projectRepository.findById(projectId);
+        const project = await this.#projectRepository.findById(projectId);
         if (!project) {
             throw new Error('Project not found');
         }
 
-        // Verify the requesting user has access to this project
         if (requestingUser.getRoleName() !== 'admin') {
-            const isMember = this.#projectRepository.isMember(projectId, requestingUser.id);
+            const isMember = await this.#projectRepository.isMember(projectId, requestingUser.id);
             const isManager = project.manager_id === requestingUser.id;
             if (!isMember && !isManager) {
                 throw new Error('Access denied: you are not a member of this project');
             }
         }
 
-        // If assigning, verify assignee is a project member
         if (assignedTo) {
-            const assignee = this.#userRepository.findById(assignedTo);
+            const assignee = await this.#userRepository.findById(assignedTo);
             if (!assignee) {
                 throw new Error('Assigned user not found');
             }
-            const isMember = this.#projectRepository.isMember(projectId, assignedTo);
+            const isMember = await this.#projectRepository.isMember(projectId, assignedTo);
             if (!isMember) {
                 throw new Error('Cannot assign task: user is not a member of this project');
             }
         }
 
-        // Step 3: INSERT INTO tasks
-        const row = this.#taskRepository.create({
-            projectId,
+        const row = await this.#taskRepository.create({
+            project_id: projectId,
             title,
             description,
             status: 'todo',
             deadline,
-            assignedTo,
-            createdBy: requestingUser.id,
+            assigned_to: assignedTo,
+            created_by: requestingUser.id,
         });
 
-        // Step 5: Async notification to assigned member (Sequence Diagram)
         if (assignedTo) {
-            this.#notificationRepository.create({
-                userId: assignedTo,
+            await this.#notificationRepository.create({
+                user_id: assignedTo,
                 message: `New task assigned: "${title}" in project "${project.title}"`,
                 type: 'task_assigned',
-                referenceId: row.id,
+                reference_id: row.id,
             });
         }
 
-        return this.#taskRepository.findByIdWithDetails(row.id);
+        return await this.#taskRepository.findById(row.id);
     }
 
-    /**
-     * Get all tasks for a project.
-     * @param {number} projectId
-     * @param {User}   requestingUser
-     * @returns {Object[]}
-     */
-    getTasksByProject(projectId, requestingUser) {
-        const project = this.#projectRepository.findById(projectId);
+    async getTasksByProject(projectId, requestingUser) {
+        const project = await this.#projectRepository.findById(projectId);
         if (!project) {
             throw new Error('Project not found');
         }
 
-        // Access control
         if (requestingUser.getRoleName() !== 'admin') {
-            const isMember = this.#projectRepository.isMember(projectId, requestingUser.id);
+            const isMember = await this.#projectRepository.isMember(projectId, requestingUser.id);
             const isManager = project.manager_id === requestingUser.id;
             if (!isMember && !isManager) {
                 throw new Error('Access denied: you are not a member of this project');
             }
         }
 
-        return this.#taskRepository.findByProject(projectId);
+        return await this.#taskRepository.findAllByProjectId(projectId);
     }
 
-    /**
-     * Get tasks assigned to the current user.
-     * @param {User} requestingUser
-     * @returns {Object[]}
-     */
-    getMyTasks(requestingUser) {
-        return this.#taskRepository.findByAssignee(requestingUser.id);
+    async getMyTasks(requestingUser) {
+        return await this.#taskRepository.findAllByUserId(requestingUser.id);
     }
 
-    /**
-     * Get a task by ID with full details.
-     * @param {number} taskId
-     * @param {User}   requestingUser
-     * @returns {Object}
-     */
-    getTaskById(taskId, requestingUser) {
-        const task = this.#taskRepository.findByIdWithDetails(taskId);
+    async getTaskById(taskId, requestingUser) {
+        const task = await this.#taskRepository.findById(taskId);
         if (!task) {
             throw new Error('Task not found');
         }
 
-        // Access control: must be member of the task's project
         if (requestingUser.getRoleName() !== 'admin') {
-            const isMember = this.#projectRepository.isMember(task.project_id, requestingUser.id);
-            const project = this.#projectRepository.findById(task.project_id);
+            const isMember = await this.#projectRepository.isMember(task.project_id, requestingUser.id);
+            const project = await this.#projectRepository.findById(task.project_id);
             const isManager = project && project.manager_id === requestingUser.id;
             if (!isMember && !isManager) {
                 throw new Error('Access denied: you are not a member of this project');
@@ -169,82 +120,56 @@ class TaskService {
         return task;
     }
 
-    /**
-     * Update task details (not status — use updateTaskStatus for that).
-     * Only the project manager or admin can update task metadata.
-     * @param {number} taskId
-     * @param {Object} data
-     * @param {User}   requestingUser
-     * @returns {Object}
-     */
-    updateTask(taskId, data, requestingUser) {
-        const task = this.#taskRepository.findById(taskId);
+    async updateTask(taskId, data, requestingUser) {
+        const task = await this.#taskRepository.findById(taskId);
         if (!task) {
             throw new Error('Task not found');
         }
 
-        const project = this.#projectRepository.findById(task.project_id);
+        const project = await this.#projectRepository.findById(task.project_id);
 
-        // Only admin or project manager can edit task metadata
         if (requestingUser.getRoleName() !== 'admin' && project.manager_id !== requestingUser.id) {
             throw new Error('Insufficient permissions: only the project manager or admin can update task details');
         }
 
-        // If reassigning, verify new assignee is a project member
         if (data.assignedTo) {
-            const isMember = this.#projectRepository.isMember(task.project_id, data.assignedTo);
+            const isMember = await this.#projectRepository.isMember(task.project_id, data.assignedTo);
             if (!isMember) {
                 throw new Error('Cannot assign task: user is not a member of this project');
             }
 
-            // Notify new assignee
             if (data.assignedTo !== task.assigned_to) {
-                this.#notificationRepository.create({
-                    userId: data.assignedTo,
+                await this.#notificationRepository.create({
+                    user_id: data.assignedTo,
                     message: `Task reassigned to you: "${task.title}"`,
                     type: 'task_assigned',
-                    referenceId: taskId,
+                    reference_id: taskId,
                 });
             }
         }
 
-        return this.#taskRepository.update(taskId, data);
+        return await this.#taskRepository.update(taskId, {
+            ...data,
+            assigned_to: data.assignedTo
+        });
     }
 
-    /**
-     * Update task status with validation.
-     * 
-     * Maps to:
-     *   useCaseDiagram → UC7: Update Task Status (Manager, Member)
-     *   classDiagram   → Task.changeStatus(), Member.updateTaskStatus()
-     * 
-     * Members can only update tasks assigned to them.
-     * Managers/Admins can update any task in their projects.
-     * 
-     * @param {number} taskId
-     * @param {string} newStatus - 'todo', 'in_progress', or 'done'
-     * @param {User}   requestingUser
-     * @returns {Object}
-     */
-    updateTaskStatus(taskId, newStatus, requestingUser) {
-        // Polymorphic permission check
+    async updateTaskStatus(taskId, newStatus, requestingUser) {
         if (!requestingUser.canUpdateTaskStatus()) {
             throw new Error('Insufficient permissions to update task status');
         }
 
-        const taskRow = this.#taskRepository.findById(taskId);
+        const taskRow = await this.#taskRepository.findById(taskId);
         if (!taskRow) {
             throw new Error('Task not found');
         }
 
-        // Members can only update their own assigned tasks
         if (requestingUser.getRoleName() === 'member') {
             if (taskRow.assigned_to !== requestingUser.id) {
                 throw new Error('Access denied: you can only update tasks assigned to you');
             }
         }
 
-        // Use the Task model's changeStatus() for transition validation
         const taskModel = new Task({
             id: taskRow.id,
             projectId: taskRow.project_id,
@@ -258,63 +183,61 @@ class TaskService {
             updatedAt: taskRow.updated_at,
         });
 
-        // This will throw if the transition is invalid
         taskModel.changeStatus(newStatus);
 
-        // Persist the valid transition
-        this.#taskRepository.updateStatus(taskId, newStatus);
+        await this.#taskRepository.updateStatus(taskId, newStatus);
 
-        // Notify relevant parties about status change
-        const project = this.#projectRepository.findById(taskRow.project_id);
+        const project = await this.#projectRepository.findById(taskRow.project_id);
         if (project && project.manager_id !== requestingUser.id) {
-            this.#notificationRepository.create({
-                userId: project.manager_id,
+            await this.#notificationRepository.create({
+                user_id: project.manager_id,
                 message: `Task "${taskRow.title}" status changed to "${newStatus}" by ${requestingUser.username}`,
                 type: 'status_change',
-                referenceId: taskId,
+                reference_id: taskId,
             });
         }
 
-        return this.#taskRepository.findByIdWithDetails(taskId);
+        return await this.#taskRepository.findById(taskId);
     }
 
-    /**
-     * Delete a task (Manager of the project or Admin only).
-     * @param {number} taskId
-     * @param {User}   requestingUser
-     * @returns {{ message: string }}
-     */
-    deleteTask(taskId, requestingUser) {
-        const task = this.#taskRepository.findById(taskId);
+    async deleteTask(taskId, requestingUser) {
+        const task = await this.#taskRepository.findById(taskId);
         if (!task) {
             throw new Error('Task not found');
         }
 
-        const project = this.#projectRepository.findById(task.project_id);
+        const project = await this.#projectRepository.findById(task.project_id);
 
         if (requestingUser.getRoleName() !== 'admin' && project.manager_id !== requestingUser.id) {
             throw new Error('Insufficient permissions: only the project manager or admin can delete tasks');
         }
 
-        this.#taskRepository.deleteById(taskId);
+        await this.#taskRepository.delete(taskId);
         return { message: `Task '${task.title}' deleted successfully` };
     }
 
-    /**
-     * Get dashboard statistics.
-     * @param {User} requestingUser
-     * @returns {Object}
-     */
-    getDashboardStats(requestingUser) {
+    async getDashboardStats(requestingUser) {
         if (requestingUser.getRoleName() === 'admin') {
+            const allTasks = await this.#taskRepository.findAll();
             return {
-                overall: this.#taskRepository.getOverallStats(),
+                overall: {
+                    todo: allTasks.filter(t => t.status === 'todo').length,
+                    in_progress: allTasks.filter(t => t.status === 'in_progress').length,
+                    done: allTasks.filter(t => t.status === 'done').length,
+                    total: allTasks.length
+                },
                 role: 'admin',
             };
         }
 
+        const myTasks = await this.#taskRepository.findAllByUserId(requestingUser.id);
         return {
-            myTasks: this.#taskRepository.getStatsByUser(requestingUser.id),
+            myTasks: {
+                todo: myTasks.filter(t => t.status === 'todo').length,
+                in_progress: myTasks.filter(t => t.status === 'in_progress').length,
+                done: myTasks.filter(t => t.status === 'done').length,
+                total: myTasks.length
+            },
             role: requestingUser.getRoleName(),
         };
     }

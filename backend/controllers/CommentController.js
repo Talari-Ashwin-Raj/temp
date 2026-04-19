@@ -1,12 +1,5 @@
 /**
  * Comment Controller
- * 
- * Controller Layer — handles HTTP requests for task comments.
- * 
- * Endpoints:
- *   GET    /api/tasks/:taskId/comments  — Get comments for a task
- *   POST   /api/tasks/:taskId/comments  — Add a comment
- *   DELETE /api/comments/:id            — Delete a comment
  */
 
 const CommentService = require('../services/CommentService');
@@ -14,12 +7,9 @@ const CommentService = require('../services/CommentService');
 const commentService = new CommentService();
 
 class CommentController {
-    /**
-     * GET /api/tasks/:taskId/comments
-     */
-    getComments(req, res) {
+    async getCommentsByTask(req, res) {
         try {
-            const comments = commentService.getCommentsByTask(
+            const comments = await commentService.getCommentsByTask(
                 parseInt(req.params.taskId),
                 req.user
             );
@@ -35,15 +25,12 @@ class CommentController {
         }
     }
 
-    /**
-     * POST /api/tasks/:taskId/comments
-     * Maps to useCaseDiagram UC8: Add Comments on Tasks
-     */
-    addComment(req, res) {
+    async addComment(req, res) {
         try {
-            const comment = commentService.addComment(
+            const { message } = req.body;
+            const comment = await commentService.addComment(
                 parseInt(req.params.taskId),
-                req.body.message,
+                message,
                 req.user
             );
             res.status(201).json({
@@ -59,12 +46,9 @@ class CommentController {
         }
     }
 
-    /**
-     * DELETE /api/comments/:id
-     */
-    deleteComment(req, res) {
+    async deleteComment(req, res) {
         try {
-            const result = commentService.deleteComment(
+            const result = await commentService.deleteComment(
                 parseInt(req.params.id),
                 req.user
             );

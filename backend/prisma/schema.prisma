@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique // 'admin', 'manager', 'member'
+  users User[]
+}
+
+model User {
+  id               Int       @id @default(autoincrement())
+  username         String    @unique
+  email            String    @unique
+  password_hash    String
+  role_id          Int
+  created_at       DateTime  @default(now())
+  
+  role             Role      @relation(fields: [role_id], references: [id])
+  
+  managed_projects Project[] @relation("ManagerProjects")
+  assigned_tasks   Task[]    @relation("AssignedTasks")
+  created_tasks    Task[]    @relation("CreatedTasks")
+  comments         Comment[]
+  notifications    Notification[]
+
+  project_memberships ProjectMember[]
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  manager_id  Int
+  created_at  DateTime @default(now())
+
+  manager     User     @relation("ManagerProjects", fields: [manager_id], references: [id])
+  tasks       Task[]
+  members     ProjectMember[]
+}
+
+model ProjectMember {
+  project_id Int
+  user_id    Int
+  joined_at  DateTime @default(now())
+
+  project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([project_id, user_id])
+}
+
+model Task {
+  id          Int       @id @default(autoincrement())
+  project_id  Int
+  title       String
+  description String?
+  status      String    @default("todo") // 'todo', 'in_progress', 'done'
+  deadline    DateTime?
+  assigned_to Int?
+  created_by  Int
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  project     Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  assignee    User?     @relation("AssignedTasks", fields: [assigned_to], references: [id], onDelete: SetNull)
+  creator     User      @relation("CreatedTasks", fields: [created_by], references: [id])
+  
+  comments    Comment[]
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  message    String
+  created_at DateTime @default(now())
+
+  task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  message      String
+  type         String
+  reference_id Int?
+  is_read      Int      @default(0) // Prisma represents Postgres ints standardly (1 or 0 for boolean, sticking to Int for compatibility with old db structure)
+  created_at   DateTime @default(now())
+
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

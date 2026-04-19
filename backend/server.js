@@ -11,6 +11,7 @@
  * and routes them to appropriate services."
  */
 
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -23,10 +24,8 @@ const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 
-// Initialise database (Singleton — creates tables on first call)
-const DatabaseConnection = require('./db/database');
-DatabaseConnection.getInstance();
-
+// Prisma Client connects automatically on first query.
+const prisma = require('./prisma/prismaClient');
 const app = express();
 const PORT = process.env.PORT || 3000;
 

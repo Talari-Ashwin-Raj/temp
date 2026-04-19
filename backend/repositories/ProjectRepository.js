@@ -1,146 +1,120 @@
-/**
- * ProjectRepository
- * 
- * Design Pattern: REPOSITORY — abstracts data access for projects and project_members.
- * Inherits generic CRUD from BaseRepository.
- */
+const prisma = require('../prisma/prismaClient');
 
-const BaseRepository = require('./BaseRepository');
+class ProjectRepository {
+  async create(projectData) {
+    const project = await prisma.project.create({
+      data: {
+        title: projectData.title,
+        description: projectData.description,
+        manager_id: projectData.manager_id,
+      }
+    });
+    return project;
+  }
 
-class ProjectRepository extends BaseRepository {
-    constructor() {
-        super('projects');
-    }
+  async findById(id) {
+    const project = await prisma.project.findUnique({
+      where: { id: parseInt(id) },
+    });
+    return project;
+  }
 
-    /**
-     * Create a new project.
-     * @param {Object} data
-     * @param {string} data.title
-     * @param {string} data.description
-     * @param {number} data.managerId
-     * @returns {Object}
-     */
-    create({ title, description, managerId }) {
-        const stmt = this.db.prepare(
-            `INSERT INTO projects (title, description, manager_id) VALUES (?, ?, ?)`
-        );
-        const result = stmt.run(title, description, managerId);
-        return this.findById(result.lastInsertRowid);
-    }
+  async findAll() {
+    // Old implementation included a member count lookup
+    const projects = await prisma.project.findMany({
+      include: {
+        _count: {
+          select: { members: true }
+        }
+      }
+    });
 
-    /**
-     * Update project details.
-     * @param {number} id
-     * @param {Object} data
-     * @returns {Object}
-     */
-    update(id, { title, description, managerId }) {
-        const stmt = this.db.prepare(
-            `UPDATE projects SET title = COALESCE(?, title), 
-             description = COALESCE(?, description), 
-             manager_id = COALESCE(?, manager_id) 
-             WHERE id = ?`
-        );
-        stmt.run(title, description, managerId, id);
-        return this.findById(id);
-    }
+    return projects.map(p => ({
+      ...p,
+      memberCount: p._count.members
+    }));
+  }
 
-    /**
-     * Get projects managed by a specific user.
-     * @param {number} managerId
-     * @returns {Object[]}
-     */
-    findByManager(managerId) {
-        const stmt = this.db.prepare('SELECT * FROM projects WHERE manager_id = ?');
-        return stmt.all(managerId);
-    }
+  async findAllByUserId(userId) {
+    // Retrieve projects the user manages OR is a member of.
+    const projects = await prisma.project.findMany({
+      where: {
+        OR: [
+          { manager_id: parseInt(userId) },
+          { members: { some: { user_id: parseInt(userId) } } }
+        ]
+      },
+      include: {
+        _count: {
+          select: { members: true }
+        }
+      }
+    });
 
-    /**
-     * Get all projects a user is a member of (or manages).
-     * @param {number} userId
-     * @returns {Object[]}
-     */
-    findByUser(userId) {
-        const stmt = this.db.prepare(`
-            SELECT DISTINCT p.* FROM projects p
-            LEFT JOIN project_members pm ON p.id = pm.project_id
-            WHERE p.manager_id = ? OR pm.user_id = ?
-            ORDER BY p.id DESC
-        `);
-        return stmt.all(userId, userId);
-    }
+    return projects.map(p => ({
+      ...p,
+      memberCount: p._count.members
+    }));
+  }
 
-    /**
-     * Get a project with its manager info.
-     * @param {number} id
-     * @returns {Object|undefined}
-     */
-    findByIdWithManager(id) {
-        const stmt = this.db.prepare(`
-            SELECT p.*, u.username as manager_name, u.email as manager_email
-            FROM projects p
-            LEFT JOIN users u ON p.manager_id = u.id
-            WHERE p.id = ?
-        `);
-        return stmt.get(id);
-    }
+  async update(id, projectData) {
+    return await prisma.project.update({
+      where: { id: parseInt(id) },
+      data: {
+        title: projectData.title,
+        description: projectData.description,
+      }
+    });
+  }
 
-    // ── Member management ──────────────────────────────────────
+  async delete(id) {
+    await prisma.project.delete({
+      where: { id: parseInt(id) }
+    });
+    return true;
+  }
 
-    /**
-     * Add a user to a project.
-     * @param {number} projectId
-     * @param {number} userId
-     * @returns {Object}
-     */
-    addMember(projectId, userId) {
-        const stmt = this.db.prepare(
-            `INSERT OR IGNORE INTO project_members (project_id, user_id) VALUES (?, ?)`
-        );
-        return stmt.run(projectId, userId);
-    }
+  async addMember(projectId, userId) {
+    return await prisma.projectMember.create({
+      data: {
+        project_id: parseInt(projectId),
+        user_id: parseInt(userId),
+      }
+    });
+  }
 
-    /**
-     * Remove a user from a project.
-     * @param {number} projectId
-     * @param {number} userId
-     * @returns {{ changes: number }}
-     */
-    removeMember(projectId, userId) {
-        const stmt = this.db.prepare(
-            `DELETE FROM project_members WHERE project_id = ? AND user_id = ?`
-        );
-        return stmt.run(projectId, userId);
-    }
+  async removeMember(projectId, userId) {
+    await prisma.projectMember.delete({
+      where: {
+        project_id_user_id: {
+            project_id: parseInt(projectId),
+            user_id: parseInt(userId)
+        }
+      }
+    });
+    return true;
+  }
 
-    /**
-     * Get all members of a project.
-     * @param {number} projectId
-     * @returns {Object[]}
-     */
-    getMembers(projectId) {
-        const stmt = this.db.prepare(`
-            SELECT u.id, u.username, u.email, r.role_name, u.role_id
-            FROM project_members pm
-            JOIN users u ON pm.user_id = u.id
-            JOIN roles r ON u.role_id = r.id
-            WHERE pm.project_id = ?
-        `);
-        return stmt.all(projectId);
-    }
+  async getMembers(projectId) {
+    const members = await prisma.projectMember.findMany({
+      where: { project_id: parseInt(projectId) },
+      include: { user: true }
+    });
 
-    /**
-     * Check if a user is a member of a project.
-     * @param {number} projectId
-     * @param {number} userId
-     * @returns {boolean}
-     */
-    isMember(projectId, userId) {
-        const stmt = this.db.prepare(
-            `SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?`
-        );
-        return !!stmt.get(projectId, userId);
-    }
+    return members.map(m => m.user);
+  }
+
+  async isMember(projectId, userId) {
+    const membership = await prisma.projectMember.findUnique({
+      where: {
+        project_id_user_id: {
+            project_id: parseInt(projectId),
+            user_id: parseInt(userId)
+        }
+      }
+    });
+    return !!membership;
+  }
 }
 
 module.exports = ProjectRepository;

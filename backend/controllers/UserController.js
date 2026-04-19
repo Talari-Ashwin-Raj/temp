@@ -3,13 +3,6 @@
  * 
  * Controller Layer — handles HTTP requests for user management.
  * Delegates business logic to UserService.
- * 
- * Endpoints:
- *   GET    /api/users          — List all users (Admin only)
- *   GET    /api/users/:id      — Get user by ID
- *   PATCH  /api/users/:id/role — Update user role (Admin only)
- *   DELETE /api/users/:id      — Delete user (Admin only)
- *   GET    /api/users/role/:roleName — Get users by role
  */
 
 const UserService = require('../services/UserService');
@@ -17,12 +10,9 @@ const UserService = require('../services/UserService');
 const userService = new UserService();
 
 class UserController {
-    /**
-     * GET /api/users
-     */
-    getAllUsers(req, res) {
+    async getAllUsers(req, res) {
         try {
-            const users = userService.getAllUsers();
+            const users = await userService.getAllUsers();
             res.status(200).json({
                 success: true,
                 data: users,
@@ -33,12 +23,9 @@ class UserController {
         }
     }
 
-    /**
-     * GET /api/users/:id
-     */
-    getUserById(req, res) {
+    async getUserById(req, res) {
         try {
-            const user = userService.getUserById(parseInt(req.params.id));
+            const user = await userService.getUserById(parseInt(req.params.id));
             res.status(200).json({
                 success: true,
                 data: user,
@@ -49,16 +36,13 @@ class UserController {
         }
     }
 
-    /**
-     * PATCH /api/users/:id/role
-     */
-    updateUserRole(req, res) {
+    async updateUserRole(req, res) {
         try {
             const { role } = req.body;
-            const user = userService.updateUserRole(
+            const user = await userService.updateUserRole(
                 parseInt(req.params.id),
                 role,
-                req.user // Polymorphic check happens inside service
+                req.user
             );
             res.status(200).json({
                 success: true,
@@ -71,12 +55,9 @@ class UserController {
         }
     }
 
-    /**
-     * DELETE /api/users/:id
-     */
-    deleteUser(req, res) {
+    async deleteUser(req, res) {
         try {
-            const result = userService.deleteUser(
+            const result = await userService.deleteUser(
                 parseInt(req.params.id),
                 req.user
             );
@@ -91,12 +72,9 @@ class UserController {
         }
     }
 
-    /**
-     * GET /api/users/role/:roleName
-     */
-    getUsersByRole(req, res) {
+    async getUsersByRole(req, res) {
         try {
-            const users = userService.getUsersByRole(req.params.roleName);
+            const users = await userService.getUsersByRole(req.params.roleName);
             res.status(200).json({
                 success: true,
                 data: users,

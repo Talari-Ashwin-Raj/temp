@@ -1,89 +1,88 @@
-/**
- * UserRepository
- * 
- * Design Pattern: REPOSITORY — abstracts data access for the users table.
- * Inherits generic CRUD from BaseRepository and adds user-specific queries.
- */
+const prisma = require('../prisma/prismaClient');
 
-const BaseRepository = require('./BaseRepository');
+class UserRepository {
+  async findByEmail(email) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { role: true },
+    });
+    return user ? this._format(user) : null;
+  }
 
-class UserRepository extends BaseRepository {
-    constructor() {
-        super('users');
-    }
+  async findByUsername(username) {
+    const user = await prisma.user.findUnique({
+      where: { username },
+      include: { role: true },
+    });
+    return user ? this._format(user) : null;
+  }
 
-    /**
-     * Find a user by email (for login).
-     * @param {string} email
-     * @returns {Object|undefined}
-     */
-    findByEmail(email) {
-        const stmt = this.db.prepare('SELECT * FROM users WHERE email = ?');
-        return stmt.get(email);
-    }
+  async findById(id) {
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(id) },
+      include: { role: true },
+    });
+    return user ? this._format(user) : null;
+  }
 
-    /**
-     * Find a user by username.
-     * @param {string} username
-     * @returns {Object|undefined}
-     */
-    findByUsername(username) {
-        const stmt = this.db.prepare('SELECT * FROM users WHERE username = ?');
-        return stmt.get(username);
-    }
+  async findAll() {
+    const users = await prisma.user.findMany({
+      include: { role: true },
+    });
+    return users.map(u => this._format(u));
+  }
 
-    /**
-     * Create a new user.
-     * @param {Object} userData
-     * @param {string} userData.username
-     * @param {string} userData.email
-     * @param {string} userData.passwordHash
-     * @param {number} userData.roleId
-     * @returns {Object} - The created user row
-     */
-    create({ username, email, passwordHash, roleId }) {
-        const stmt = this.db.prepare(
-            `INSERT INTO users (username, email, password_hash, role_id) 
-             VALUES (?, ?, ?, ?)`
-        );
-        const result = stmt.run(username, email, passwordHash, roleId);
-        return this.findById(result.lastInsertRowid);
-    }
+  async findByRole(roleName) {
+    const users = await prisma.user.findMany({
+      where: { role: { name: roleName } },
+      include: { role: true },
+    });
+    return users.map(u => this._format(u));
+  }
 
-    /**
-     * Update a user's role.
-     * @param {number} userId
-     * @param {number} newRoleId
-     * @returns {{ changes: number }}
-     */
-    updateRole(userId, newRoleId) {
-        const stmt = this.db.prepare('UPDATE users SET role_id = ? WHERE id = ?');
-        return stmt.run(newRoleId, userId);
-    }
+  async create(userData) {
+    // We expect role_id to be passed directly or fetched by Service
+    const user = await prisma.user.create({
+      data: {
+        username: userData.username,
+        email: userData.email,
+        password_hash: userData.password_hash,
+        role_id: userData.role_id,
+      },
+      include: { role: true }
+    });
+    return this._format(user);
+  }
 
-    /**
-     * Find all users with a specific role.
-     * @param {number} roleId
-     * @returns {Object[]}
-     */
-    findByRole(roleId) {
-        const stmt = this.db.prepare('SELECT * FROM users WHERE role_id = ?');
-        return stmt.all(roleId);
-    }
+  async updateRole(id, roleId) {
+    const user = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: { role_id: roleId },
+      include: { role: true }
+    });
+    return this._format(user);
+  }
 
-    /**
-     * Find all users with role name joined from roles table.
-     * @returns {Object[]}
-     */
-    findAllWithRoles() {
-        const stmt = this.db.prepare(`
-            SELECT u.id, u.username, u.email, u.role_id, r.role_name, u.created_at
-            FROM users u
-            JOIN roles r ON u.role_id = r.id
-            ORDER BY u.id
-        `);
-        return stmt.all();
-    }
+  async delete(id) {
+    await prisma.user.delete({
+      where: { id: parseInt(id) },
+    });
+    return true;
+  }
+
+  async getRoleByName(roleName) {
+    return await prisma.role.findUnique({
+      where: { name: roleName }
+    });
+  }
+
+  // Format to match old output specs expected by Factory / Services
+  _format(prismaUser) {
+    return {
+      ...prismaUser,
+      role: prismaUser.role.name // Flattens nested role object into string as before
+    };
+  }
 }
 
 module.exports = UserRepository;

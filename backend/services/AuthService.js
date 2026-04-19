@@ -49,12 +49,12 @@ class AuthService {
         }
 
         // Check for existing user
-        const existingEmail = this.#userRepository.findByEmail(email);
+        const existingEmail = await this.#userRepository.findByEmail(email);
         if (existingEmail) {
             throw new Error('A user with this email already exists');
         }
 
-        const existingUsername = this.#userRepository.findByUsername(username);
+        const existingUsername = await this.#userRepository.findByUsername(username);
         if (existingUsername) {
             throw new Error('A user with this username already exists');
         }
@@ -67,11 +67,11 @@ class AuthService {
         const roleId = roleIdMap[role.toLowerCase()];
 
         // Create user in DB
-        const dbRow = this.#userRepository.create({
+        const dbRow = await this.#userRepository.create({
             username,
             email,
-            passwordHash,
-            roleId,
+            password_hash: passwordHash,
+            role_id: roleId,
         });
 
         // Use Factory to create the correct User subclass
@@ -98,7 +98,7 @@ class AuthService {
         }
 
         // Find user by email
-        const dbRow = this.#userRepository.findByEmail(email);
+        const dbRow = await this.#userRepository.findByEmail(email);
         if (!dbRow) {
             throw new Error('Invalid email or password');
         }
@@ -125,11 +125,11 @@ class AuthService {
      * @returns {Admin|Manager|Member}
      * @throws {Error} if token is invalid or user not found
      */
-    verifyToken(token) {
+    async verifyToken(token) {
         try {
             const payload = jwt.verify(token, JWT_SECRET);
 
-            const dbRow = this.#userRepository.findById(payload.userId);
+            const dbRow = await this.#userRepository.findById(payload.userId);
             if (!dbRow) {
                 throw new Error('User not found');
             }

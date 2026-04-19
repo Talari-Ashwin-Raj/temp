@@ -1,77 +1,62 @@
-/**
- * CommentRepository
- * 
- * Design Pattern: REPOSITORY — abstracts data access for the comments table.
- * Inherits generic CRUD from BaseRepository.
- */
+const prisma = require('../prisma/prismaClient');
 
-const BaseRepository = require('./BaseRepository');
+class CommentRepository {
+  async create(commentData) {
+    const comment = await prisma.comment.create({
+      data: {
+        task_id: commentData.task_id,
+        user_id: commentData.user_id,
+        message: commentData.message,
+      },
+      include: {
+        user: { 
+            include: { role: true } 
+        }
+      }
+    });
+    return this._format(comment);
+  }
 
-class CommentRepository extends BaseRepository {
-    constructor() {
-        super('comments');
-    }
+  async findById(id) {
+    const comment = await prisma.comment.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        user: { 
+            include: { role: true } 
+        }
+      }
+    });
+    return comment ? this._format(comment) : null;
+  }
 
-    /**
-     * Create a new comment on a task.
-     * @param {Object} data
-     * @param {number} data.taskId
-     * @param {number} data.userId
-     * @param {string} data.message
-     * @returns {Object}
-     */
-    create({ taskId, userId, message }) {
-        const stmt = this.db.prepare(
-            `INSERT INTO comments (task_id, user_id, message) VALUES (?, ?, ?)`
-        );
-        const result = stmt.run(taskId, userId, message);
-        return this.findByIdWithUser(result.lastInsertRowid);
-    }
+  async findAllByTaskId(taskId) {
+    const comments = await prisma.comment.findMany({
+      where: { task_id: parseInt(taskId) },
+      orderBy: { created_at: 'asc' },
+      include: {
+        user: { 
+            include: { role: true } 
+        }
+      }
+    });
+    return comments.map(c => this._format(c));
+  }
 
-    /**
-     * Find all comments for a task, with author info.
-     * @param {number} taskId
-     * @returns {Object[]}
-     */
-    findByTask(taskId) {
-        const stmt = this.db.prepare(`
-            SELECT c.*, u.username as author_name, r.role_name as author_role
-            FROM comments c
-            JOIN users u ON c.user_id = u.id
-            JOIN roles r ON u.role_id = r.id
-            WHERE c.task_id = ?
-            ORDER BY c.created_at ASC
-        `);
-        return stmt.all(taskId);
-    }
+  async delete(id) {
+    await prisma.comment.delete({
+      where: { id: parseInt(id) }
+    });
+    return true;
+  }
 
-    /**
-     * Find a single comment by ID with user info.
-     * @param {number} id
-     * @returns {Object|undefined}
-     */
-    findByIdWithUser(id) {
-        const stmt = this.db.prepare(`
-            SELECT c.*, u.username as author_name, r.role_name as author_role
-            FROM comments c
-            JOIN users u ON c.user_id = u.id
-            JOIN roles r ON u.role_id = r.id
-            WHERE c.id = ?
-        `);
-        return stmt.get(id);
-    }
-
-    /**
-     * Count comments for a task.
-     * @param {number} taskId
-     * @returns {number}
-     */
-    countByTask(taskId) {
-        const stmt = this.db.prepare(
-            'SELECT COUNT(*) as total FROM comments WHERE task_id = ?'
-        );
-        return stmt.get(taskId).total;
-    }
+  // Flattens the nested user relational lookup into what the controller expects
+  _format(prismaComment) {
+    return {
+        ...prismaComment,
+        author_name: prismaComment.user?.username,
+        author_role: prismaComment.user?.role?.name
+    };
+  }
 }
 
 module.exports = CommentRepository;

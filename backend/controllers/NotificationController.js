@@ -1,13 +1,5 @@
 /**
  * Notification Controller
- * 
- * Controller Layer — handles HTTP requests for notifications.
- * 
- * Endpoints:
- *   GET   /api/notifications          — Get all notifications for current user
- *   GET   /api/notifications/unread   — Get unread notifications
- *   PATCH /api/notifications/:id/read — Mark notification as read
- *   PATCH /api/notifications/read-all — Mark all as read
  */
 
 const NotificationService = require('../services/NotificationService');
@@ -15,27 +7,21 @@ const NotificationService = require('../services/NotificationService');
 const notificationService = new NotificationService();
 
 class NotificationController {
-    /**
-     * GET /api/notifications
-     */
-    getNotifications(req, res) {
+    async getNotifications(req, res) {
         try {
-            const data = notificationService.getNotifications(req.user);
+            const data = await notificationService.getNotifications(req.user);
             res.status(200).json({
                 success: true,
-                data,
+                ...data,
             });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
         }
     }
 
-    /**
-     * GET /api/notifications/unread
-     */
-    getUnreadNotifications(req, res) {
+    async getUnreadNotifications(req, res) {
         try {
-            const notifications = notificationService.getUnreadNotifications(req.user);
+            const notifications = await notificationService.getUnreadNotifications(req.user);
             res.status(200).json({
                 success: true,
                 data: notifications,
@@ -46,12 +32,9 @@ class NotificationController {
         }
     }
 
-    /**
-     * PATCH /api/notifications/:id/read
-     */
-    markAsRead(req, res) {
+    async markAsRead(req, res) {
         try {
-            const result = notificationService.markAsRead(
+            const result = await notificationService.markAsRead(
                 parseInt(req.params.id),
                 req.user
             );
@@ -60,17 +43,14 @@ class NotificationController {
                 ...result,
             });
         } catch (err) {
-            const status = err.message.includes('not found') ? 404 : 500;
+            const status = err.message.includes('not found') ? 404 : 400;
             res.status(status).json({ success: false, error: err.message });
         }
     }
 
-    /**
-     * PATCH /api/notifications/read-all
-     */
-    markAllAsRead(req, res) {
+    async markAllAsRead(req, res) {
         try {
-            const result = notificationService.markAllAsRead(req.user);
+            const result = await notificationService.markAllAsRead(req.user);
             res.status(200).json({
                 success: true,
                 ...result,

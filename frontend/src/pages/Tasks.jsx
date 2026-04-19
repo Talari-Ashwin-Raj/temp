@@ -44,10 +44,15 @@ export default function Tasks() {
       ApiClient.getProjectMembers(newTask.projectId)
         .then(res => setProjectMembers(res.data))
         .catch(err => console.error(err));
+    } else if (showDetailModal && canCreate) {
+      // Dynamic member list retrieval for the task detail modal's re-assignment dropdown
+      ApiClient.getProjectMembers(showDetailModal.project_id)
+        .then(res => setProjectMembers(res.data))
+        .catch(err => console.error(err));
     } else {
       setProjectMembers([]);
     }
-  }, [newTask.projectId]);
+  }, [newTask.projectId, showDetailModal, canCreate]);
 
   useEffect(() => {
     if (showDetailModal) {
@@ -79,6 +84,31 @@ export default function Tasks() {
       fetchData();
       if (showDetailModal && showDetailModal.id === taskId) {
         setShowDetailModal(prev => ({ ...prev, status: newStatus }));
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleAssigneeChange = async (taskId, newAssigneeId) => {
+    try {
+      const payload = {
+        title: showDetailModal.title,
+        description: showDetailModal.description,
+        deadline: showDetailModal.deadline,
+        assignedTo: newAssigneeId ? parseInt(newAssigneeId) : null
+      };
+      const res = await ApiClient.updateTask(taskId, payload);
+      
+      fetchData();
+      if (showDetailModal && showDetailModal.id === taskId) {
+        // Hydrate assignee name proactively for instant feedback
+        const memberName = projectMembers.find(m => m.id === parseInt(newAssigneeId))?.username || null;
+        setShowDetailModal(prev => ({ 
+          ...prev, 
+          assigned_to: newAssigneeId ? parseInt(newAssigneeId) : null,
+          assigned_to_name: memberName
+        }));
       }
     } catch (err) {
       alert(err.message);
@@ -261,7 +291,7 @@ export default function Tasks() {
             
             <p className="mb-4">{showDetailModal.description || 'No description provided.'}</p>
             
-            <div className="grid grid-cols-2 mb-6" style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '1rem', borderRadius: '8px' }}>
+            <div className="grid grid-cols-2 mb-6 gap-4" style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '1rem', borderRadius: '8px' }}>
               <div>
                 <span className="text-xs text-muted block mb-1">Status</span>
                 <select 
@@ -277,7 +307,21 @@ export default function Tasks() {
               </div>
               <div>
                 <span className="text-xs text-muted block mb-1">Assigned To</span>
-                <div className="font-medium">{showDetailModal.assigned_to_name || 'Unassigned'}</div>
+                {canCreate ? (
+                  <select 
+                    className="form-select" 
+                    value={showDetailModal.assigned_to || ''}
+                    onChange={(e) => handleAssigneeChange(showDetailModal.id, e.target.value)}
+                    style={{ padding: '0.4rem', fontSize: '0.875rem' }}
+                  >
+                    <option value="">Unassigned</option>
+                    {projectMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.username}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="font-medium text-sm mt-2">{showDetailModal.assigned_to_name || 'Unassigned'}</div>
+                )}
               </div>
             </div>
 

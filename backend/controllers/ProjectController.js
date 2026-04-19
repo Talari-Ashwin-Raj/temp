@@ -2,17 +2,6 @@
  * Project Controller
  * 
  * Controller Layer — handles HTTP requests for project management.
- * Delegates business logic to ProjectService.
- * 
- * Endpoints:
- *   GET    /api/projects                      — List projects
- *   POST   /api/projects                      — Create project
- *   GET    /api/projects/:id                   — Get project details
- *   PUT    /api/projects/:id                   — Update project
- *   DELETE /api/projects/:id                   — Delete project (Admin only)
- *   GET    /api/projects/:id/members           — List project members
- *   POST   /api/projects/:id/members           — Add member
- *   DELETE /api/projects/:id/members/:userId   — Remove member
  */
 
 const ProjectService = require('../services/ProjectService');
@@ -20,12 +9,9 @@ const ProjectService = require('../services/ProjectService');
 const projectService = new ProjectService();
 
 class ProjectController {
-    /**
-     * GET /api/projects
-     */
-    getProjects(req, res) {
+    async getProjects(req, res) {
         try {
-            const projects = projectService.getProjects(req.user);
+            const projects = await projectService.getProjects(req.user);
             res.status(200).json({
                 success: true,
                 data: projects,
@@ -36,12 +22,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * POST /api/projects
-     */
-    createProject(req, res) {
+    async createProject(req, res) {
         try {
-            const project = projectService.createProject(req.body, req.user);
+            const project = await projectService.createProject(req.body, req.user);
             res.status(201).json({
                 success: true,
                 message: 'Project created successfully',
@@ -53,12 +36,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * GET /api/projects/:id
-     */
-    getProjectById(req, res) {
+    async getProjectById(req, res) {
         try {
-            const project = projectService.getProjectById(
+            const project = await projectService.getProjectById(
                 parseInt(req.params.id),
                 req.user
             );
@@ -73,12 +53,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * PUT /api/projects/:id
-     */
-    updateProject(req, res) {
+    async updateProject(req, res) {
         try {
-            const project = projectService.updateProject(
+            const project = await projectService.updateProject(
                 parseInt(req.params.id),
                 req.body,
                 req.user
@@ -95,12 +72,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * DELETE /api/projects/:id
-     */
-    deleteProject(req, res) {
+    async deleteProject(req, res) {
         try {
-            const result = projectService.deleteProject(
+            const result = await projectService.deleteProject(
                 parseInt(req.params.id),
                 req.user
             );
@@ -115,12 +89,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * GET /api/projects/:id/members
-     */
-    getMembers(req, res) {
+    async getMembers(req, res) {
         try {
-            const members = projectService.getMembers(parseInt(req.params.id));
+            const members = await projectService.getMembers(parseInt(req.params.id));
             res.status(200).json({
                 success: true,
                 data: members,
@@ -132,12 +103,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * POST /api/projects/:id/members
-     */
-    addMember(req, res) {
+    async addMember(req, res) {
         try {
-            const result = projectService.addMember(
+            const result = await projectService.addMember(
                 parseInt(req.params.id),
                 parseInt(req.body.userId),
                 req.user
@@ -154,12 +122,9 @@ class ProjectController {
         }
     }
 
-    /**
-     * DELETE /api/projects/:id/members/:userId
-     */
-    removeMember(req, res) {
+    async removeMember(req, res) {
         try {
-            const result = projectService.removeMember(
+            const result = await projectService.removeMember(
                 parseInt(req.params.id),
                 parseInt(req.params.userId),
                 req.user

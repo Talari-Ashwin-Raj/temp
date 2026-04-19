@@ -1,95 +1,61 @@
-/**
- * NotificationRepository
- * 
- * Design Pattern: REPOSITORY — abstracts data access for the notifications table.
- * Supports the async notification flow from the Sequence Diagram.
- */
+const prisma = require('../prisma/prismaClient');
 
-const BaseRepository = require('./BaseRepository');
+class NotificationRepository {
+  async create(notificationData) {
+    const notification = await prisma.notification.create({
+      data: {
+        user_id: notificationData.user_id,
+        message: notificationData.message,
+        type: notificationData.type,
+        reference_id: notificationData.reference_id,
+        is_read: 0,
+      }
+    });
+    return notification;
+  }
 
-class NotificationRepository extends BaseRepository {
-    constructor() {
-        super('notifications');
+  async findById(id) {
+    return await prisma.notification.findUnique({
+      where: { id: parseInt(id) }
+    });
+  }
+
+  async findAllByUserId(userId, unreadOnly = false) {
+    const whereClause = { user_id: parseInt(userId) };
+    if (unreadOnly) {
+      whereClause.is_read = 0;
     }
 
-    /**
-     * Create a notification.
-     * @param {Object} data
-     * @param {number} data.userId   - recipient
-     * @param {string} data.message
-     * @param {string} data.type     - e.g. 'task_assigned', 'comment_added'
-     * @param {number} [data.referenceId] - related entity ID
-     * @returns {Object}
-     */
-    create({ userId, message, type, referenceId }) {
-        const stmt = this.db.prepare(
-            `INSERT INTO notifications (user_id, message, type, reference_id)
-             VALUES (?, ?, ?, ?)`
-        );
-        const result = stmt.run(userId, message, type || 'task_assigned', referenceId || null);
-        return this.findById(result.lastInsertRowid);
-    }
+    return await prisma.notification.findMany({
+      where: whereClause,
+      orderBy: { created_at: 'desc' }
+    });
+  }
 
-    /**
-     * Find all notifications for a user (newest first).
-     * @param {number} userId
-     * @returns {Object[]}
-     */
-    findByUser(userId) {
-        const stmt = this.db.prepare(
-            `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`
-        );
-        return stmt.all(userId);
-    }
+  async markAsRead(id) {
+    return await prisma.notification.update({
+      where: { id: parseInt(id) },
+      data: { is_read: 1 }
+    });
+  }
 
-    /**
-     * Find unread notifications for a user.
-     * @param {number} userId
-     * @returns {Object[]}
-     */
-    findUnreadByUser(userId) {
-        const stmt = this.db.prepare(
-            `SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC`
-        );
-        return stmt.all(userId);
-    }
+  async markAllAsRead(userId) {
+    await prisma.notification.updateMany({
+      where: { 
+          user_id: parseInt(userId),
+          is_read: 0 
+      },
+      data: { is_read: 1 }
+    });
+    return true;
+  }
 
-    /**
-     * Mark a notification as read.
-     * @param {number} id
-     * @param {number} userId - ensures the user owns this notification
-     * @returns {{ changes: number }}
-     */
-    markAsRead(id, userId) {
-        const stmt = this.db.prepare(
-            `UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`
-        );
-        return stmt.run(id, userId);
-    }
-
-    /**
-     * Mark all notifications as read for a user.
-     * @param {number} userId
-     * @returns {{ changes: number }}
-     */
-    markAllAsRead(userId) {
-        const stmt = this.db.prepare(
-            `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`
-        );
-        return stmt.run(userId);
-    }
-
-    /**
-     * Count unread notifications.
-     * @param {number} userId
-     * @returns {number}
-     */
-    countUnread(userId) {
-        const stmt = this.db.prepare(
-            `SELECT COUNT(*) as total FROM notifications WHERE user_id = ? AND is_read = 0`
-        );
-        return stmt.get(userId).total;
-    }
+  async delete(id) {
+    await prisma.notification.delete({
+      where: { id: parseInt(id) }
+    });
+    return true;
+  }
 }
 
 module.exports = NotificationRepository;

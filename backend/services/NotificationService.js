@@ -2,8 +2,6 @@
  * NotificationService
  * 
  * Design Pattern: SERVICE LAYER — business logic for notifications.
- * 
- * Maps to sequenceDiagram → "Asynchronous Notification: API → Member"
  */
 
 const NotificationRepository = require('../repositories/NotificationRepository');
@@ -15,49 +13,31 @@ class NotificationService {
         this.#notificationRepository = new NotificationRepository();
     }
 
-    /**
-     * Get all notifications for the current user.
-     * @param {User} requestingUser
-     * @returns {Object}
-     */
-    getNotifications(requestingUser) {
-        const notifications = this.#notificationRepository.findByUser(requestingUser.id);
-        const unreadCount = this.#notificationRepository.countUnread(requestingUser.id);
+    async getNotifications(requestingUser) {
+        const notifications = await this.#notificationRepository.findAllByUserId(requestingUser.id, false);
+        const unreadCountArray = await this.#notificationRepository.findAllByUserId(requestingUser.id, true);
 
-        return { notifications, unreadCount };
+        return { notifications, unreadCount: unreadCountArray.length };
     }
 
-    /**
-     * Get only unread notifications.
-     * @param {User} requestingUser
-     * @returns {Object[]}
-     */
-    getUnreadNotifications(requestingUser) {
-        return this.#notificationRepository.findUnreadByUser(requestingUser.id);
+    async getUnreadNotifications(requestingUser) {
+        return await this.#notificationRepository.findAllByUserId(requestingUser.id, true);
     }
 
-    /**
-     * Mark a specific notification as read.
-     * @param {number} notificationId
-     * @param {User}   requestingUser
-     * @returns {{ message: string }}
-     */
-    markAsRead(notificationId, requestingUser) {
-        const result = this.#notificationRepository.markAsRead(notificationId, requestingUser.id);
-        if (result.changes === 0) {
-            throw new Error('Notification not found or already read');
+    async markAsRead(notificationId, requestingUser) {
+        // Find to ensure it belongs to the user
+        const notification = await this.#notificationRepository.findById(notificationId);
+        if (!notification || notification.user_id !== requestingUser.id) {
+            throw new Error('Notification not found or access denied');
         }
+
+        await this.#notificationRepository.markAsRead(notificationId);
         return { message: 'Notification marked as read' };
     }
 
-    /**
-     * Mark all notifications as read for the current user.
-     * @param {User} requestingUser
-     * @returns {{ message: string, count: number }}
-     */
-    markAllAsRead(requestingUser) {
-        const result = this.#notificationRepository.markAllAsRead(requestingUser.id);
-        return { message: 'All notifications marked as read', count: result.changes };
+    async markAllAsRead(requestingUser) {
+        await this.#notificationRepository.markAllAsRead(requestingUser.id);
+        return { message: 'All unread notifications marked as read' };
     }
 }
 

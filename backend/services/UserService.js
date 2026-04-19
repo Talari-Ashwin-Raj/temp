@@ -2,10 +2,6 @@
  * UserService
  * 
  * Design Pattern: SERVICE LAYER — business logic for user management.
- * 
- * Maps to useCaseDiagram:
- *   - Admin → Manage Users (UC implied via Admin.manageUsers())
- *   - All actors → Login/Register (delegated to AuthService)
  */
 
 const UserRepository = require('../repositories/UserRepository');
@@ -22,8 +18,8 @@ class UserService {
      * Get all users (Admin only).
      * @returns {Object[]}
      */
-    getAllUsers() {
-        const rows = this.#userRepository.findAllWithRoles();
+    async getAllUsers() {
+        const rows = await this.#userRepository.findAll();
         return rows.map(row => {
             const user = UserFactory.createFromDB(row);
             return user.toJSON();
@@ -36,8 +32,8 @@ class UserService {
      * @returns {Object}
      * @throws {Error} if user not found
      */
-    getUserById(userId) {
-        const row = this.#userRepository.findById(userId);
+    async getUserById(userId) {
+        const row = await this.#userRepository.findById(userId);
         if (!row) {
             throw new Error('User not found');
         }
@@ -52,7 +48,7 @@ class UserService {
      * @param {User}   requestingUser - the admin performing the action
      * @returns {Object}
      */
-    updateUserRole(userId, newRole, requestingUser) {
+    async updateUserRole(userId, newRole, requestingUser) {
         // Polymorphic permission check
         if (!requestingUser.canManageUsers()) {
             throw new Error('Insufficient permissions: only admins can change user roles');
@@ -70,7 +66,7 @@ class UserService {
             throw new Error('Cannot change your own role');
         }
 
-        this.#userRepository.updateRole(userId, newRoleId);
+        await this.#userRepository.updateRole(userId, newRoleId);
         return this.getUserById(userId);
     }
 
@@ -80,7 +76,7 @@ class UserService {
      * @param {User}   requestingUser
      * @returns {{ message: string }}
      */
-    deleteUser(userId, requestingUser) {
+    async deleteUser(userId, requestingUser) {
         // Polymorphic permission check
         if (!requestingUser.canManageUsers()) {
             throw new Error('Insufficient permissions: only admins can delete users');
@@ -90,12 +86,12 @@ class UserService {
             throw new Error('Cannot delete your own account');
         }
 
-        const row = this.#userRepository.findById(userId);
+        const row = await this.#userRepository.findById(userId);
         if (!row) {
             throw new Error('User not found');
         }
 
-        this.#userRepository.deleteById(userId);
+        await this.#userRepository.delete(userId);
         return { message: `User '${row.username}' deleted successfully` };
     }
 
@@ -104,13 +100,13 @@ class UserService {
      * @param {string} roleName
      * @returns {Object[]}
      */
-    getUsersByRole(roleName) {
+    async getUsersByRole(roleName) {
         const roleIdMap = { admin: 1, manager: 2, member: 3 };
         const roleId = roleIdMap[roleName.toLowerCase()];
         if (!roleId) {
             throw new Error(`Invalid role: ${roleName}`);
         }
-        const rows = this.#userRepository.findByRole(roleId);
+        const rows = await this.#userRepository.findByRole(roleName);
         return rows.map(row => UserFactory.createFromDB(row).toJSON());
     }
 }

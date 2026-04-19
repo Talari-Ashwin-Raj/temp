@@ -2,20 +2,6 @@
  * Task Controller
  * 
  * Controller Layer — handles HTTP requests for task management.
- * Delegates business logic to TaskService.
- * 
- * Implements the Sequence Diagram flow:
- *   POST /api/tasks → Validate JWT → Validate Permissions → INSERT → 201 → Notification
- * 
- * Endpoints:
- *   POST   /api/tasks                  — Create task
- *   GET    /api/tasks/my               — Get tasks assigned to me
- *   GET    /api/tasks/project/:projectId — Get tasks by project
- *   GET    /api/tasks/:id              — Get task details
- *   PUT    /api/tasks/:id              — Update task
- *   PATCH  /api/tasks/:id/status       — Update task status
- *   DELETE /api/tasks/:id              — Delete task
- *   GET    /api/tasks/dashboard/stats  — Get dashboard statistics
  */
 
 const TaskService = require('../services/TaskService');
@@ -23,15 +9,10 @@ const TaskService = require('../services/TaskService');
 const taskService = new TaskService();
 
 class TaskController {
-    /**
-     * POST /api/tasks
-     * Maps to sequenceDiagram step 3: App → API: POST /api/tasks (JWT Token)
-     */
-    createTask(req, res) {
+    async createTask(req, res) {
         try {
-            const task = taskService.createTask(req.body, req.user);
+            const task = await taskService.createTask(req.body, req.user);
 
-            // Maps to sequenceDiagram step 8: API → App: 201 Created (Success)
             res.status(201).json({
                 success: true,
                 message: 'Task created successfully',
@@ -45,12 +26,9 @@ class TaskController {
         }
     }
 
-    /**
-     * GET /api/tasks/my
-     */
-    getMyTasks(req, res) {
+    async getMyTasks(req, res) {
         try {
-            const tasks = taskService.getMyTasks(req.user);
+            const tasks = await taskService.getMyTasks(req.user);
             res.status(200).json({
                 success: true,
                 data: tasks,
@@ -61,12 +39,9 @@ class TaskController {
         }
     }
 
-    /**
-     * GET /api/tasks/project/:projectId
-     */
-    getTasksByProject(req, res) {
+    async getTasksByProject(req, res) {
         try {
-            const tasks = taskService.getTasksByProject(
+            const tasks = await taskService.getTasksByProject(
                 parseInt(req.params.projectId),
                 req.user
             );
@@ -82,12 +57,9 @@ class TaskController {
         }
     }
 
-    /**
-     * GET /api/tasks/:id
-     */
-    getTaskById(req, res) {
+    async getTaskById(req, res) {
         try {
-            const task = taskService.getTaskById(
+            const task = await taskService.getTaskById(
                 parseInt(req.params.id),
                 req.user
             );
@@ -102,12 +74,9 @@ class TaskController {
         }
     }
 
-    /**
-     * PUT /api/tasks/:id
-     */
-    updateTask(req, res) {
+    async updateTask(req, res) {
         try {
-            const task = taskService.updateTask(
+            const task = await taskService.updateTask(
                 parseInt(req.params.id),
                 req.body,
                 req.user
@@ -124,14 +93,10 @@ class TaskController {
         }
     }
 
-    /**
-     * PATCH /api/tasks/:id/status
-     * Maps to useCaseDiagram UC7: Update Task Status
-     */
-    updateTaskStatus(req, res) {
+    async updateTaskStatus(req, res) {
         try {
             const { status } = req.body;
-            const task = taskService.updateTaskStatus(
+            const task = await taskService.updateTaskStatus(
                 parseInt(req.params.id),
                 status,
                 req.user
@@ -150,12 +115,9 @@ class TaskController {
         }
     }
 
-    /**
-     * DELETE /api/tasks/:id
-     */
-    deleteTask(req, res) {
+    async deleteTask(req, res) {
         try {
-            const result = taskService.deleteTask(
+            const result = await taskService.deleteTask(
                 parseInt(req.params.id),
                 req.user
             );
@@ -170,13 +132,9 @@ class TaskController {
         }
     }
 
-    /**
-     * GET /api/tasks/dashboard/stats
-     * Maps to useCaseDiagram UC9: View Dashboard
-     */
-    getDashboardStats(req, res) {
+    async getDashboardStats(req, res) {
         try {
-            const stats = taskService.getDashboardStats(req.user);
+            const stats = await taskService.getDashboardStats(req.user);
             res.status(200).json({
                 success: true,
                 data: stats,

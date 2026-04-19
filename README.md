@@ -20,7 +20,7 @@ It features a premium dark-mode React single-page application (SPA) on the front
 
 - **Frontend:** React, Vite, React Router DOM, Vanilla CSS (Premium Dark Theme, Glassmorphism).
 - **Backend:** Node.js, Express.js.
-- **Database:** SQLite3 (via `better-sqlite3` for synchronous speed and WAL mode).
+- **Database:** Supabase (PostgreSQL) integrated natively via **Prisma ORM**.
 - **Security:** `jsonwebtoken` (JWT), `bcryptjs`.
 
 ## ⚙️ Installation & Setup
@@ -58,19 +58,12 @@ The application will now be running. You can open your browser to `http://localh
 
 ## 🔑 Test Credentials
 
-The backend seed script (`npm run seed`) provisions several accounts across all roles so you can test the RBAC rules properly without registering iteratively. 
+There are two primary accounts provisioned for testing access control, project creation, and task management functions without needing to register iteratively:
 
-**The password for ALL seeded accounts is:** `password123`
-
-| Role | Username | Email | Try testing... |
-| :--- | :--- | :--- | :--- |
-| **Admin** | admin | `admin@taskhandler.com` | Deleting projects/users, viewing overarching stats. |
-| **Manager** | john_manager | `john@taskhandler.com` | Creating projects, assigning members to projects, creating tasks. |
-| **Manager** | sarah_manager | `sarah@taskhandler.com` | Similar to John, but manages different projects. |
-| **Member** | alice_member | `alice@taskhandler.com` | Altering the status on Alice's specific tasks, attempting to access restricted project creation. |
-| **Member** | bob_member | `bob@taskhandler.com` | Updating tasks, commenting on team tasks. |
-| **Member** | carol_member | `carol@taskhandler.com` | - |
-| **Member** | dave_member | `dave@taskhandler.com` | - |
+| Role | Username | Email | Password | Try testing... |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin** | admin | `admin@taskhandler.com` | `password123` | Generating projects, assigning managers, viewing overarching stats. |
+| **Member** | new | `new@taskhandler.com` | `123456` | Altering task status, commenting on tasks, testing restricted access. |
 
 *Note: You can easily test the Async notifications by having two browsers (e.g. Chrome, Firefox) open simultaneously: logging into the Manager account on one, and a Member on the other. Assigning a task from the Manager instantly triggers a notification to populate in the Member's Navbar!*
 # temp

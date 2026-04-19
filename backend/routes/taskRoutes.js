@@ -41,7 +41,7 @@ router.patch('/:id/status', (req, res) => taskController.updateTaskStatus(req, r
 router.delete('/:id', authorize('admin', 'manager'), (req, res) => taskController.deleteTask(req, res));
 
 // Comment routes nested under tasks
-router.get('/:taskId/comments', (req, res) => commentController.getComments(req, res));
+router.get('/:taskId/comments', (req, res) => commentController.getCommentsByTask(req, res));
 router.post('/:taskId/comments', (req, res) => commentController.addComment(req, res));
 
 module.exports = router;
